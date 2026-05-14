@@ -17,11 +17,14 @@ const TR_COLUMN_MAP: Record<string, string> = {
   wertpapier: "instrumentName",
   asset: "instrumentName",
   "asset name": "instrumentName",
+  name: "instrumentName",
   isin: "isin",
+  symbol: "isin",
   anzahl: "shares",
   shares: "shares",
   "anzahl (stk.)": "shares",
   kurs: "pricePerShare",
+  price: "pricePerShare",
   "price per share": "pricePerShare",
   "kurs pro aktie": "pricePerShare",
   betrag: "totalAmount",
@@ -34,32 +37,46 @@ const TR_COLUMN_MAP: Record<string, string> = {
   tax: "tax",
   notiz: "note",
   note: "note",
+  description: "note",
 };
 
 const TR_TYPE_MAP: Record<string, TransactionType> = {
   kauf: "buy",
   buy: "buy",
   purchase: "buy",
+  BUY: "buy",
   verkauf: "sell",
   sell: "sell",
   sale: "sell",
+  SELL: "sell",
   dividende: "dividend",
   dividend: "dividend",
+  DIVIDEND: "dividend",
   zinsen: "interest",
   interest: "interest",
+  INTEREST: "interest",
+  INTEREST_PAYMENT: "interest",
   einzahlung: "deposit",
   deposit: "deposit",
+  DEPOSIT: "deposit",
+  TRANSFER_INSTANT_INBOUND: "deposit",
+  TRANSFER_INBOUND: "deposit",
   auszahlung: "withdrawal",
   withdrawal: "withdrawal",
+  WITHDRAWAL: "withdrawal",
   gebühr: "fee",
   fee: "fee",
+  FEE: "fee",
   steuer: "tax",
   tax: "tax",
+  TAX: "tax",
   saveback: "saveback",
   "card cashback": "card_cashback",
   "card refund": "card_refund",
   "karten-cashback": "card_cashback",
   "karten-erstattung": "card_refund",
+  CARD_TRANSACTION: "card_transaction",
+  "card transaction": "card_transaction",
 };
 
 function normalizeColumnName(col: string): string {
@@ -74,11 +91,22 @@ function mapTransactionType(raw: string): TransactionType {
 
 function parseNumber(val: string | undefined | null): number {
   if (!val) return 0;
-  // Handle European number format: 1.234,56 -> 1234.56
-  const cleaned = val
-    .replace(/[€$\s]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
+  // Remove currency symbols and spaces
+  let cleaned = val.replace(/[€$\s]/g, "");
+  
+  // Check if it's European format (has comma as decimal separator and dots as thousands)
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    // European format: 1.234,56 -> 1234.56
+    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  } else if (cleaned.includes(',')) {
+    // Could be European decimal: 1234,56 -> 1234.56
+    // Check if comma is used as decimal (only one comma and it's near the end)
+    const parts = cleaned.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      cleaned = cleaned.replace(",", ".");
+    }
+  }
+  
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
 }
@@ -136,10 +164,10 @@ export function parseTradeRepublicCSV(csvText: string): ImportResult {
     try {
       const type = mapTransactionType(row.type || "");
       const instrumentName = (row.instrumentName || row.instrumentname || "").trim();
-      const isin = (row.isin || "").trim();
+      const isin = (row.isin || row.symbol || "").trim();
       const date = parseDate(row.date || "");
       const shares = parseNumber(row.shares);
-      const pricePerShare = parseNumber(row.pricepershare || row.pricePerShare);
+      const pricePerShare = parseNumber(row.pricepershare || row.pricePerShare || row.price);
       const totalAmount = parseNumber(row.totalamount || row.totalAmount || row.amount);
       const fee = parseNumber(row.fee);
       const tax = parseNumber(row.tax);

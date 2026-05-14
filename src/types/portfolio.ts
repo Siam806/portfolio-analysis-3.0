@@ -13,6 +13,7 @@ export const TransactionTypeEnum = z.enum([
   "saveback",
   "card_cashback",
   "card_refund",
+  "card_transaction",
   "unknown",
 ]);
 export type TransactionType = z.infer<typeof TransactionTypeEnum>;
